@@ -45,26 +45,20 @@ const PDFPreview = ({ pdfBlob }: PDFPreviewProps) => {
           </div>
         )}
         {pdfUrl && !error && (
-          <object
-            data={pdfUrl}
-            type="application/pdf"
-            className="w-full h-[600px]"
-            aria-label="PDF Preview"
-          >
-            <embed
-              src={pdfUrl}
-              type="application/pdf"
-              className="w-full h-[600px]"
-            />
-            <div className="p-8 text-center">
-              <p className="text-muted-foreground mb-4">
-                Your browser does not support PDF preview.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Click the Download button below to view the PDF.
-              </p>
-            </div>
-          </object>
+          <div className="w-full h-[600px] flex items-center justify-center">
+            <p className="text-sm text-muted-foreground text-center px-6">
+              Trình duyệt của bạn đang chặn PDF trong khung nhúng.
+              <br />
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Mở PDF trong tab mới
+              </a>
+            </p>
+          </div>
         )}
       </div>
     </Card>
