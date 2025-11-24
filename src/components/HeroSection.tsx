@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { addVietnameseFont, getVietnameseFontConfig } from '@/utils/pdfFonts';
 
 const HeroSection = () => {
   const [isDragging, setIsDragging] = useState(false);
@@ -125,7 +126,7 @@ const HeroSection = () => {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!uploadedFile) return;
 
     try {
@@ -146,6 +147,15 @@ const HeroSection = () => {
         format: pageSize === 'auto' ? 'a4' : pageSize,
       });
 
+      // Load Vietnamese font
+      toast({
+        title: "Loading font...",
+        description: "Preparing Vietnamese font support",
+      });
+      
+      await addVietnameseFont(doc);
+      const fontConfig = getVietnameseFontConfig();
+
       const sheetsToProcess = mergeSheets 
         ? workbook.SheetNames 
         : [workbook.SheetNames[0]];
@@ -160,26 +170,26 @@ const HeroSection = () => {
           doc.addPage();
         }
         
-        // Add sheet title with better font support
+        // Add sheet title with Vietnamese font support
         doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(fontConfig.font, 'bold');
         doc.text(sheetName, 14, 15);
         
         if (sheetData.length === 0) {
           doc.setFontSize(10);
-          doc.setFont('helvetica', 'normal');
+          doc.setFont(fontConfig.font, 'normal');
           doc.text('No data in this sheet', 14, 25);
           return;
         }
 
-        // Use autoTable for better Unicode/Vietnamese support
+        // Use autoTable with Vietnamese font
         autoTable(doc, {
           startY: 20,
           head: sheetData.length > 0 ? [sheetData[0]] : [],
           body: sheetData.slice(1),
           theme: 'grid',
           styles: {
-            font: 'helvetica',
+            font: fontConfig.font,
             fontSize: 8,
             cellPadding: 2,
             overflow: 'linebreak',
@@ -190,6 +200,7 @@ const HeroSection = () => {
             textColor: [0, 0, 0],
             fontStyle: 'bold',
             halign: 'center',
+            font: fontConfig.font,
           },
           columnStyles: {
             // Auto-size columns
@@ -197,6 +208,7 @@ const HeroSection = () => {
           didDrawPage: (data) => {
             // Add page numbers
             const pageCount = doc.getNumberOfPages();
+            doc.setFont(fontConfig.font, 'normal');
             doc.setFontSize(8);
             doc.text(
               `Page ${pageCount}`,
@@ -218,7 +230,7 @@ const HeroSection = () => {
       
       toast({
         title: "Download successful",
-        description: `${pdfFilename} has been downloaded with full Unicode support`,
+        description: `${pdfFilename} with Vietnamese font support`,
       });
     } catch (error) {
       console.error('PDF generation error:', error);
