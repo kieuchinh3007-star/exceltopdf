@@ -6,42 +6,53 @@ let fontBase64Cache: string | null = null;
 
 /**
  * Fetch Roboto font TTF and convert to base64
- * Using a CDN that provides TTF format
+ * Using multiple fallback CDNs
  */
 async function fetchRobotoFont(): Promise<string> {
   if (fontBase64Cache) {
     return fontBase64Cache;
   }
 
-  try {
-    // Using a CDN that provides TTF format
-    // Alternative: Use cdnjs or other CDN with TTF fonts
-    const fontUrl = 'https://cdn.jsdelivr.net/npm/roboto-fontface@0.10.0/fonts/roboto/Roboto-Regular.ttf';
-    
-    const response = await fetch(fontUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch font: ${response.statusText}`);
+  // Try multiple CDN sources
+  const fontUrls = [
+    'https://cdnjs.cloudflare.com/ajax/libs/font-roboto/0.0.0/font/Roboto-Regular.ttf',
+    'https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Regular.ttf',
+  ];
+
+  for (const fontUrl of fontUrls) {
+    try {
+      console.log('Trying to fetch font from:', fontUrl);
+      const response = await fetch(fontUrl);
+      
+      if (!response.ok) {
+        console.warn(`Font fetch failed from ${fontUrl}:`, response.statusText);
+        continue;
+      }
+      
+      const fontBlob = await response.blob();
+      
+      // Convert blob to base64
+      const base64Font = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          // Remove the data URL prefix
+          const base64Font = base64.split(',')[1];
+          resolve(base64Font);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(fontBlob);
+      });
+      
+      fontBase64Cache = base64Font;
+      return base64Font;
+    } catch (error) {
+      console.warn(`Error loading font from ${fontUrl}:`, error);
+      continue;
     }
-    
-    const fontBlob = await response.blob();
-    
-    // Convert blob to base64
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        // Remove the data URL prefix
-        const base64Font = base64.split(',')[1];
-        fontBase64Cache = base64Font;
-        resolve(base64Font);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(fontBlob);
-    });
-  } catch (error) {
-    console.error('Error loading font:', error);
-    throw error;
   }
+
+  throw new Error('Failed to load font from all sources');
 }
 
 /**
@@ -67,6 +78,7 @@ export async function addVietnameseFont(doc: jsPDF): Promise<void> {
     doc.setFont('Roboto', 'normal');
     
     fontLoaded = true;
+    console.log('Vietnamese font loaded successfully');
   } catch (error) {
     console.error('Failed to load Vietnamese font, using fallback:', error);
     // Fallback to default font
@@ -84,4 +96,5 @@ export function getVietnameseFontConfig() {
     fontStyle: 'normal' as const,
   };
 }
+
 
