@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Upload, FileSpreadsheet, FileText, Settings } from "lucide-react";
+import { useState, useRef } from "react";
+import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 const HeroSection = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -24,10 +26,69 @@ const HeroSection = () => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    // Handle file upload logic here
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  };
+
+  const handleFileUpload = (file: File) => {
+    // Validate file type
+    const validTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.xls',
+      '.xlsx'
+    ];
+    
+    const isValidType = validTypes.some(type => 
+      file.type === type || file.name.toLowerCase().endsWith(type)
+    );
+
+    if (!isValidType) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an Excel file (.xls or .xlsx)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadedFile(file);
     toast({
       title: "File uploaded successfully",
-      description: "Converting your Excel file to PDF...",
+      description: `${file.name} is ready to convert`,
+    });
+  };
+
+  const handleRemoveFile = () => {
+    setUploadedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleConvert = () => {
+    if (!uploadedFile) {
+      toast({
+        title: "No file selected",
+        description: "Please upload an Excel file first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Converting...",
+      description: `Converting ${uploadedFile.name} to PDF`,
     });
   };
 
@@ -58,6 +119,8 @@ const HeroSection = () => {
             className={`p-8 md:p-12 border-2 border-dashed transition-all duration-300 ${
               isDragging
                 ? "border-primary bg-accent scale-[1.02]"
+                : uploadedFile
+                ? "border-success bg-success/5"
                 : "border-border hover:border-primary/50 hover:shadow-medium"
             }`}
             onDragOver={handleDragOver}
@@ -65,34 +128,80 @@ const HeroSection = () => {
             onDrop={handleDrop}
           >
             <div className="flex flex-col items-center gap-6">
-              {/* Icons */}
-              <div className="flex items-center gap-4">
-                <div className="p-4 rounded-2xl bg-success/10">
-                  <FileSpreadsheet className="w-8 h-8 text-success" />
-                </div>
-                <div className="text-muted-foreground">→</div>
-                <div className="p-4 rounded-2xl bg-destructive/10">
-                  <FileText className="w-8 h-8 text-destructive" />
-                </div>
-              </div>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="file-upload"
+              />
+              {uploadedFile ? (
+                /* Uploaded File Display */
+                <div className="w-full max-w-md space-y-6 animate-fade-in">
+                  <div className="flex items-center gap-3 p-4 bg-success/10 rounded-lg border border-success/20">
+                    <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-success mb-1">Upload successful!</p>
+                      <p className="text-sm text-foreground truncate">{uploadedFile.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(uploadedFile.size / 1024).toFixed(2)} KB
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleRemoveFile}
+                      className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
+                      aria-label="Remove file"
+                    >
+                      <X className="w-5 h-5 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
 
-              {/* Upload Text */}
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Upload className="w-5 h-5 text-primary" />
-                  <p className="text-lg font-semibold">
-                    Drop your Excel file here or click to upload
-                  </p>
+                  {/* Convert Button */}
+                  <Button size="lg" className="w-full" onClick={handleConvert}>
+                    <FileText className="w-5 h-5 mr-2" />
+                    Convert to PDF
+                  </Button>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Supports .xls and .xlsx files
-                </p>
-              </div>
+              ) : (
+                /* Upload Area */
+                <>
+                  {/* Icons */}
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 rounded-2xl bg-success/10">
+                      <FileSpreadsheet className="w-8 h-8 text-success" />
+                    </div>
+                    <div className="text-muted-foreground">→</div>
+                    <div className="p-4 rounded-2xl bg-destructive/10">
+                      <FileText className="w-8 h-8 text-destructive" />
+                    </div>
+                  </div>
 
-              {/* Upload Button */}
-              <Button size="lg" className="min-w-[200px]">
-                Convert Excel to PDF
-              </Button>
+                  {/* Upload Text */}
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Upload className="w-5 h-5 text-primary" />
+                      <p className="text-lg font-semibold">
+                        Drop your Excel file here or click to upload
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Supports .xls and .xlsx files
+                    </p>
+                  </div>
+
+                  {/* Upload Button */}
+                  <Button 
+                    size="lg" 
+                    className="min-w-[200px]"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="w-5 h-5 mr-2" />
+                    Choose File
+                  </Button>
+                </>
+              )}
 
               {/* Settings Toggle */}
               <button
