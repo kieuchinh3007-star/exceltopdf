@@ -10,12 +10,17 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { addVietnameseFont, getVietnameseFontConfig } from '@/utils/pdfFonts';
+import ExcelPreview from './ExcelPreview';
+import PDFPreview from './PDFPreview';
 
 const HeroSection = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [isConverted, setIsConverted] = useState(false);
+  const [showExcelPreview, setShowExcelPreview] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pageSize, setPageSize] = useState("auto");
   const [orientation, setOrientation] = useState("auto");
   const [mergeSheets, setMergeSheets] = useState(true);
@@ -81,6 +86,9 @@ const HeroSection = () => {
     setUploadedFile(null);
     setIsConverted(false);
     setIsConverting(false);
+    setShowExcelPreview(false);
+    setShowPdfPreview(false);
+    setPdfBlob(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -97,24 +105,33 @@ const HeroSection = () => {
     }
 
     setIsConverting(true);
+    setShowPdfPreview(false);
     
     try {
       // Read the Excel file
       const data = await uploadedFile.arrayBuffer();
       const workbook = XLSX.read(data);
       
-      // Store workbook data for later use in download
+      // Store workbook data for later use
       (window as any).convertedWorkbook = workbook;
+      (window as any).XLSX = XLSX; // Make XLSX available for preview component
+      
+      // Show Excel preview
+      setShowExcelPreview(true);
       
       // Simulate some processing time for better UX
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // Generate PDF for preview
+      await generatePDF(workbook, true); // true = for preview only
+      
       setIsConverting(false);
       setIsConverted(true);
+      setShowPdfPreview(true);
       
       toast({
         title: "Conversion complete!",
-        description: `${uploadedFile.name} has been converted to PDF`,
+        description: "Preview your PDF below. Click Download when ready.",
       });
     } catch (error) {
       setIsConverting(false);
@@ -123,6 +140,92 @@ const HeroSection = () => {
         description: "There was an error reading the Excel file",
         variant: "destructive",
       });
+    }
+  };
+
+  const generatePDF = async (workbook: any, previewOnly: boolean = false) => {
+    // Create PDF with selected settings
+    const doc = new jsPDF({
+      orientation: orientation === 'auto' ? 'landscape' : orientation as 'portrait' | 'landscape',
+      unit: 'mm',
+      format: pageSize === 'auto' ? 'a4' : pageSize,
+    });
+
+    // Load Vietnamese font
+    await addVietnameseFont(doc);
+    const fontConfig = getVietnameseFontConfig();
+
+    const sheetsToProcess = mergeSheets 
+      ? workbook.SheetNames 
+      : [workbook.SheetNames[0]];
+
+    sheetsToProcess.forEach((sheetName: string, sheetIndex: number) => {
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Convert sheet to array of arrays
+      const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
+      
+      if (sheetIndex > 0) {
+        doc.addPage();
+      }
+      
+      // Add sheet title with Vietnamese font support
+      doc.setFontSize(14);
+      doc.setFont(fontConfig.font, 'bold');
+      doc.text(sheetName, 14, 15);
+      
+      if (sheetData.length === 0) {
+        doc.setFontSize(10);
+        doc.setFont(fontConfig.font, 'normal');
+        doc.text('No data in this sheet', 14, 25);
+        return;
+      }
+
+      // Use autoTable with Vietnamese font
+      autoTable(doc, {
+        startY: 20,
+        head: sheetData.length > 0 ? [sheetData[0]] : [],
+        body: sheetData.slice(1),
+        theme: 'grid',
+        styles: {
+          font: fontConfig.font,
+          fontSize: 8,
+          cellPadding: 2,
+          overflow: 'linebreak',
+          cellWidth: 'wrap',
+        },
+        headStyles: {
+          fillColor: [240, 240, 240],
+          textColor: [0, 0, 0],
+          fontStyle: 'bold',
+          halign: 'center',
+          font: fontConfig.font,
+        },
+        didDrawPage: (data) => {
+          // Add page numbers
+          const pageCount = doc.getNumberOfPages();
+          doc.setFont(fontConfig.font, 'normal');
+          doc.setFontSize(8);
+          doc.text(
+            `Page ${pageCount}`,
+            doc.internal.pageSize.getWidth() / 2,
+            doc.internal.pageSize.getHeight() - 10,
+            { align: 'center' }
+          );
+        },
+        margin: { top: 20, left: 10, right: 10, bottom: 15 },
+        tableWidth: 'auto',
+      });
+    });
+
+    if (previewOnly) {
+      // Generate blob for preview
+      const pdfBlobData = doc.output('blob');
+      setPdfBlob(pdfBlobData);
+    } else {
+      // Generate filename and download
+      const pdfFilename = uploadedFile!.name.replace(/\.(xlsx?|xls)$/i, '.pdf');
+      doc.save(pdfFilename);
     }
   };
 
@@ -140,97 +243,16 @@ const HeroSection = () => {
         return;
       }
 
-      // Create PDF with selected settings
-      const doc = new jsPDF({
-        orientation: orientation === 'auto' ? 'landscape' : orientation as 'portrait' | 'landscape',
-        unit: 'mm',
-        format: pageSize === 'auto' ? 'a4' : pageSize,
-      });
-
-      // Load Vietnamese font
       toast({
-        title: "Loading font...",
-        description: "Preparing Vietnamese font support",
-      });
-      
-      await addVietnameseFont(doc);
-      const fontConfig = getVietnameseFontConfig();
-
-      const sheetsToProcess = mergeSheets 
-        ? workbook.SheetNames 
-        : [workbook.SheetNames[0]];
-
-      sheetsToProcess.forEach((sheetName, sheetIndex) => {
-        const worksheet = workbook.Sheets[sheetName];
-        
-        // Convert sheet to array of arrays
-        const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
-        
-        if (sheetIndex > 0) {
-          doc.addPage();
-        }
-        
-        // Add sheet title with Vietnamese font support
-        doc.setFontSize(14);
-        doc.setFont(fontConfig.font, 'bold');
-        doc.text(sheetName, 14, 15);
-        
-        if (sheetData.length === 0) {
-          doc.setFontSize(10);
-          doc.setFont(fontConfig.font, 'normal');
-          doc.text('No data in this sheet', 14, 25);
-          return;
-        }
-
-        // Use autoTable with Vietnamese font
-        autoTable(doc, {
-          startY: 20,
-          head: sheetData.length > 0 ? [sheetData[0]] : [],
-          body: sheetData.slice(1),
-          theme: 'grid',
-          styles: {
-            font: fontConfig.font,
-            fontSize: 8,
-            cellPadding: 2,
-            overflow: 'linebreak',
-            cellWidth: 'wrap',
-          },
-          headStyles: {
-            fillColor: [240, 240, 240],
-            textColor: [0, 0, 0],
-            fontStyle: 'bold',
-            halign: 'center',
-            font: fontConfig.font,
-          },
-          columnStyles: {
-            // Auto-size columns
-          },
-          didDrawPage: (data) => {
-            // Add page numbers
-            const pageCount = doc.getNumberOfPages();
-            doc.setFont(fontConfig.font, 'normal');
-            doc.setFontSize(8);
-            doc.text(
-              `Page ${pageCount}`,
-              doc.internal.pageSize.getWidth() / 2,
-              doc.internal.pageSize.getHeight() - 10,
-              { align: 'center' }
-            );
-          },
-          margin: { top: 20, left: 10, right: 10, bottom: 15 },
-          tableWidth: 'auto',
-        });
+        title: "Downloading...",
+        description: "Generating your PDF file",
       });
 
-      // Generate filename
-      const pdfFilename = uploadedFile.name.replace(/\.(xlsx?|xls)$/i, '.pdf');
-      
-      // Save the PDF
-      doc.save(pdfFilename);
+      await generatePDF(workbook, false);
       
       toast({
         title: "Download successful",
-        description: `${pdfFilename} with Vietnamese font support`,
+        description: `${uploadedFile.name.replace(/\.(xlsx?|xls)$/i, '.pdf')} has been downloaded`,
       });
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -430,6 +452,20 @@ const HeroSection = () => {
               </p>
             </div>
           </Card>
+
+          {/* Excel Preview Section */}
+          {showExcelPreview && (window as any).convertedWorkbook && (
+            <div className="mt-6">
+              <ExcelPreview workbook={(window as any).convertedWorkbook} />
+            </div>
+          )}
+
+          {/* PDF Preview Section */}
+          {showPdfPreview && pdfBlob && (
+            <div className="mt-6">
+              <PDFPreview pdfBlob={pdfBlob} />
+            </div>
+          )}
         </div>
       </div>
     </section>
