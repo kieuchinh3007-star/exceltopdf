@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from 'jspdf';
+import * as XLSX from 'xlsx';
 
 const HeroSection = () => {
   const [isDragging, setIsDragging] = useState(false);
@@ -95,50 +96,145 @@ const HeroSection = () => {
 
     setIsConverting(true);
     
-    // Simulate conversion process
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    setIsConverting(false);
-    setIsConverted(true);
-    
-    toast({
-      title: "Conversion complete!",
-      description: `${uploadedFile.name} has been converted to PDF`,
-    });
+    try {
+      // Read the Excel file
+      const data = await uploadedFile.arrayBuffer();
+      const workbook = XLSX.read(data);
+      
+      // Store workbook data for later use in download
+      (window as any).convertedWorkbook = workbook;
+      
+      // Simulate some processing time for better UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setIsConverting(false);
+      setIsConverted(true);
+      
+      toast({
+        title: "Conversion complete!",
+        description: `${uploadedFile.name} has been converted to PDF`,
+      });
+    } catch (error) {
+      setIsConverting(false);
+      toast({
+        title: "Conversion failed",
+        description: "There was an error reading the Excel file",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDownload = () => {
     if (!uploadedFile) return;
 
     try {
-      // Create a real PDF using jsPDF
+      const workbook = (window as any).convertedWorkbook;
+      if (!workbook) {
+        toast({
+          title: "Error",
+          description: "No converted data found. Please convert the file first.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create PDF with selected settings
       const doc = new jsPDF({
-        orientation: orientation === 'auto' ? 'portrait' : orientation as 'portrait' | 'landscape',
+        orientation: orientation === 'auto' ? 'landscape' : orientation as 'portrait' | 'landscape',
         unit: 'mm',
         format: pageSize === 'auto' ? 'a4' : pageSize,
       });
 
-      // Add content to PDF
-      doc.setFontSize(16);
-      doc.text('Excel to PDF Conversion', 20, 20);
-      
-      doc.setFontSize(12);
-      doc.text(`Original file: ${uploadedFile.name}`, 20, 35);
-      doc.text(`File size: ${(uploadedFile.size / 1024).toFixed(2)} KB`, 20, 45);
-      doc.text(`Converted on: ${new Date().toLocaleString()}`, 20, 55);
-      
-      doc.setFontSize(10);
-      doc.text('Conversion Settings:', 20, 70);
-      doc.text(`- Page Size: ${pageSize}`, 25, 80);
-      doc.text(`- Orientation: ${orientation}`, 25, 87);
-      doc.text(`- Merge Sheets: ${mergeSheets ? 'Yes' : 'No'}`, 25, 94);
-      
-      doc.setFontSize(9);
-      doc.setTextColor(100);
-      doc.text('Note: This is a demo conversion. In production, this would contain', 20, 110);
-      doc.text('the actual Excel spreadsheet data formatted as a PDF.', 20, 117);
-      
-      // Generate PDF filename from original Excel filename
+      const sheetsToProcess = mergeSheets 
+        ? workbook.SheetNames 
+        : [workbook.SheetNames[0]];
+
+      let currentPage = 0;
+
+      sheetsToProcess.forEach((sheetName, sheetIndex) => {
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convert sheet to array of arrays
+        const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+        
+        if (sheetIndex > 0) {
+          doc.addPage();
+        }
+        
+        // Add sheet title
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(sheetName, 14, 15);
+        
+        // Starting position for table
+        let yPosition = 25;
+        const cellPadding = 2;
+        const rowHeight = 7;
+        const startX = 14;
+        
+        // Calculate column widths based on content
+        const maxCols = Math.max(...sheetData.map(row => row?.length || 0));
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const availableWidth = pageWidth - (startX * 2);
+        const colWidth = availableWidth / Math.min(maxCols, 10); // Max 10 columns visible
+        
+        doc.setFontSize(9);
+        
+        // Render table data
+        sheetData.forEach((row, rowIndex) => {
+          if (!row) return;
+          
+          // Check if we need a new page
+          if (yPosition > doc.internal.pageSize.getHeight() - 20) {
+            doc.addPage();
+            yPosition = 15;
+            
+            // Re-add sheet title on new page
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${sheetName} (continued)`, startX, yPosition);
+            yPosition += 10;
+            doc.setFontSize(9);
+          }
+          
+          // Set header style
+          if (rowIndex === 0) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFillColor(240, 240, 240);
+          } else {
+            doc.setFont('helvetica', 'normal');
+          }
+          
+          row.forEach((cell, colIndex) => {
+            if (colIndex >= 10) return; // Limit to 10 columns
+            
+            const xPosition = startX + (colIndex * colWidth);
+            const cellText = cell !== null && cell !== undefined ? String(cell) : '';
+            
+            // Draw cell border
+            doc.rect(xPosition, yPosition, colWidth, rowHeight);
+            
+            // Fill header background
+            if (rowIndex === 0) {
+              doc.rect(xPosition, yPosition, colWidth, rowHeight, 'F');
+            }
+            
+            // Draw text (with truncation if too long)
+            const maxChars = Math.floor(colWidth / 2);
+            const truncatedText = cellText.length > maxChars 
+              ? cellText.substring(0, maxChars - 2) + '..' 
+              : cellText;
+            
+            doc.text(truncatedText, xPosition + cellPadding, yPosition + 5);
+          });
+          
+          yPosition += rowHeight;
+        });
+        
+        currentPage++;
+      });
+
+      // Generate filename
       const pdfFilename = uploadedFile.name.replace(/\.(xlsx?|xls)$/i, '.pdf');
       
       // Save the PDF
@@ -146,9 +242,10 @@ const HeroSection = () => {
       
       toast({
         title: "Download successful",
-        description: `${pdfFilename} has been downloaded`,
+        description: `${pdfFilename} has been downloaded with real Excel data`,
       });
     } catch (error) {
+      console.error('PDF generation error:', error);
       toast({
         title: "Download failed",
         description: "There was an error generating the PDF",
