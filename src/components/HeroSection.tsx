@@ -107,11 +107,33 @@ const HeroSection = () => {
   };
 
   const handleDownload = () => {
+    if (!uploadedFile) return;
+
+    // Create a dummy PDF blob (in production, this would be the actual converted PDF)
+    const pdfContent = `PDF converted from ${uploadedFile.name}`;
+    const blob = new Blob([pdfContent], { type: 'application/pdf' });
+    
+    // Create download link
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Generate PDF filename from original Excel filename
+    const pdfFilename = uploadedFile.name.replace(/\.(xlsx?|xls)$/i, '.pdf');
+    link.download = pdfFilename;
+    
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
     toast({
-      title: "Downloading PDF",
-      description: "Your PDF file is being downloaded",
+      title: "Download started",
+      description: `${pdfFilename} is being downloaded`,
     });
-    // In a real implementation, this would download the actual converted PDF
   };
 
   return (
