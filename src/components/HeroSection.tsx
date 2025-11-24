@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, FileSpreadsheet, FileText, Settings, CheckCircle2, X } from "lucide-react";
+import { Upload, FileSpreadsheet, FileText, CheckCircle2, X, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -9,8 +9,12 @@ import { useToast } from "@/hooks/use-toast";
 
 const HeroSection = () => {
   const [isDragging, setIsDragging] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
+  const [isConverted, setIsConverted] = useState(false);
+  const [pageSize, setPageSize] = useState("auto");
+  const [orientation, setOrientation] = useState("auto");
+  const [mergeSheets, setMergeSheets] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -71,12 +75,14 @@ const HeroSection = () => {
 
   const handleRemoveFile = () => {
     setUploadedFile(null);
+    setIsConverted(false);
+    setIsConverting(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const handleConvert = () => {
+  const handleConvert = async () => {
     if (!uploadedFile) {
       toast({
         title: "No file selected",
@@ -86,10 +92,26 @@ const HeroSection = () => {
       return;
     }
 
+    setIsConverting(true);
+    
+    // Simulate conversion process
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    
+    setIsConverting(false);
+    setIsConverted(true);
+    
     toast({
-      title: "Converting...",
-      description: `Converting ${uploadedFile.name} to PDF`,
+      title: "Conversion complete!",
+      description: `${uploadedFile.name} has been converted to PDF`,
     });
+  };
+
+  const handleDownload = () => {
+    toast({
+      title: "Downloading PDF",
+      description: "Your PDF file is being downloaded",
+    });
+    // In a real implementation, this would download the actual converted PDF
   };
 
   return (
@@ -138,7 +160,7 @@ const HeroSection = () => {
                 id="file-upload"
               />
               {uploadedFile ? (
-                /* Uploaded File Display */
+                /* Uploaded File Display & Settings */
                 <div className="w-full max-w-md space-y-6 animate-fade-in">
                   <div className="flex items-center gap-3 p-4 bg-success/10 rounded-lg border border-success/20">
                     <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
@@ -153,16 +175,86 @@ const HeroSection = () => {
                       onClick={handleRemoveFile}
                       className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
                       aria-label="Remove file"
+                      disabled={isConverting}
                     >
                       <X className="w-5 h-5 text-muted-foreground hover:text-destructive" />
                     </button>
                   </div>
 
-                  {/* Convert Button */}
-                  <Button size="lg" className="w-full" onClick={handleConvert}>
-                    <FileText className="w-5 h-5 mr-2" />
-                    Convert to PDF
-                  </Button>
+                  {/* Conversion Options - Always visible when file is uploaded */}
+                  {!isConverted && (
+                    <div className="w-full pt-4 border-t border-border space-y-4">
+                      <h3 className="font-semibold text-sm text-foreground mb-3">Conversion Options</h3>
+                      <div className="grid gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="page-size">Page Size</Label>
+                          <Select value={pageSize} onValueChange={setPageSize} disabled={isConverting}>
+                            <SelectTrigger id="page-size">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="auto">Auto</SelectItem>
+                              <SelectItem value="a4">A4</SelectItem>
+                              <SelectItem value="letter">Letter</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label htmlFor="orientation">Orientation</Label>
+                          <Select value={orientation} onValueChange={setOrientation} disabled={isConverting}>
+                            <SelectTrigger id="orientation">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="auto">Auto</SelectItem>
+                              <SelectItem value="portrait">Portrait</SelectItem>
+                              <SelectItem value="landscape">Landscape</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="merge-sheets" className="cursor-pointer">
+                            Merge all sheets into one PDF
+                          </Label>
+                          <Switch 
+                            id="merge-sheets" 
+                            checked={mergeSheets}
+                            onCheckedChange={setMergeSheets}
+                            disabled={isConverting}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Convert Button or Download Button */}
+                  {isConverted ? (
+                    <Button size="lg" className="w-full" onClick={handleDownload}>
+                      <Download className="w-5 h-5 mr-2" />
+                      Download PDF
+                    </Button>
+                  ) : (
+                    <Button 
+                      size="lg" 
+                      className="w-full" 
+                      onClick={handleConvert}
+                      disabled={isConverting}
+                    >
+                      {isConverting ? (
+                        <>
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          Converting...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-5 h-5 mr-2" />
+                          Convert to PDF
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               ) : (
                 /* Upload Area */
@@ -203,56 +295,6 @@ const HeroSection = () => {
                 </>
               )}
 
-              {/* Settings Toggle */}
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Settings className="w-4 h-4" />
-                <span>{showSettings ? "Hide" : "Show"} conversion options</span>
-              </button>
-
-              {/* Optional Settings */}
-              {showSettings && (
-                <div className="w-full max-w-md pt-6 border-t border-border space-y-4 animate-slide-up">
-                  <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="page-size">Page Size</Label>
-                      <Select defaultValue="auto">
-                        <SelectTrigger id="page-size">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">Auto</SelectItem>
-                          <SelectItem value="a4">A4</SelectItem>
-                          <SelectItem value="letter">Letter</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="orientation">Orientation</Label>
-                      <Select defaultValue="auto">
-                        <SelectTrigger id="orientation">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">Auto</SelectItem>
-                          <SelectItem value="portrait">Portrait</SelectItem>
-                          <SelectItem value="landscape">Landscape</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="merge-sheets" className="cursor-pointer">
-                        Merge all sheets into one PDF
-                      </Label>
-                      <Switch id="merge-sheets" />
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Security Notice */}
               <p className="text-xs text-muted-foreground">
