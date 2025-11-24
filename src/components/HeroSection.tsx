@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
 
 const HeroSection = () => {
   const [isDragging, setIsDragging] = useState(false);
@@ -109,31 +110,51 @@ const HeroSection = () => {
   const handleDownload = () => {
     if (!uploadedFile) return;
 
-    // Create a dummy PDF blob (in production, this would be the actual converted PDF)
-    const pdfContent = `PDF converted from ${uploadedFile.name}`;
-    const blob = new Blob([pdfContent], { type: 'application/pdf' });
-    
-    // Create download link
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    
-    // Generate PDF filename from original Excel filename
-    const pdfFilename = uploadedFile.name.replace(/\.(xlsx?|xls)$/i, '.pdf');
-    link.download = pdfFilename;
-    
-    // Trigger download
-    document.body.appendChild(link);
-    link.click();
-    
-    // Cleanup
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    
-    toast({
-      title: "Download started",
-      description: `${pdfFilename} is being downloaded`,
-    });
+    try {
+      // Create a real PDF using jsPDF
+      const doc = new jsPDF({
+        orientation: orientation === 'auto' ? 'portrait' : orientation as 'portrait' | 'landscape',
+        unit: 'mm',
+        format: pageSize === 'auto' ? 'a4' : pageSize,
+      });
+
+      // Add content to PDF
+      doc.setFontSize(16);
+      doc.text('Excel to PDF Conversion', 20, 20);
+      
+      doc.setFontSize(12);
+      doc.text(`Original file: ${uploadedFile.name}`, 20, 35);
+      doc.text(`File size: ${(uploadedFile.size / 1024).toFixed(2)} KB`, 20, 45);
+      doc.text(`Converted on: ${new Date().toLocaleString()}`, 20, 55);
+      
+      doc.setFontSize(10);
+      doc.text('Conversion Settings:', 20, 70);
+      doc.text(`- Page Size: ${pageSize}`, 25, 80);
+      doc.text(`- Orientation: ${orientation}`, 25, 87);
+      doc.text(`- Merge Sheets: ${mergeSheets ? 'Yes' : 'No'}`, 25, 94);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      doc.text('Note: This is a demo conversion. In production, this would contain', 20, 110);
+      doc.text('the actual Excel spreadsheet data formatted as a PDF.', 20, 117);
+      
+      // Generate PDF filename from original Excel filename
+      const pdfFilename = uploadedFile.name.replace(/\.(xlsx?|xls)$/i, '.pdf');
+      
+      // Save the PDF
+      doc.save(pdfFilename);
+      
+      toast({
+        title: "Download successful",
+        description: `${pdfFilename} has been downloaded`,
+      });
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "There was an error generating the PDF",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
