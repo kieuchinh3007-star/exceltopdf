@@ -45,25 +45,19 @@ const PDFPreview = ({ pdfBlob }: PDFPreviewProps) => {
           </div>
         )}
         {pdfUrl && !error && (
-          <div className="w-full flex flex-col gap-4">
-            <div className="w-full h-[600px]">
-              <iframe
-                src={pdfUrl}
-                title="PDF Preview"
-                className="w-full h-full border-0"
-              />
-            </div>
-            <p className="text-sm text-muted-foreground text-center px-6">
-              Nếu PDF không hiển thị đúng, bạn có thể tải file về và mở trực tiếp trên máy.
+          <div className="w-full flex flex-col items-center justify-center py-10 gap-4">
+            <p className="text-sm text-muted-foreground text-center px-6 max-w-xl">
+              Chrome hoặc extension bảo mật đang chặn việc xem PDF trực tiếp trên trang.
               <br />
-              <a
-                href={pdfUrl}
-                download="excel-to-pdf.pdf"
-                className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                Tải PDF xuống
-              </a>
+              Bạn vẫn có thể tải file về và mở bằng trình đọc PDF trên máy.
             </p>
+            <a
+              href={pdfUrl}
+              download="excel-to-pdf.pdf"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Tải PDF xuống
+            </a>
           </div>
         )}
       </div>
