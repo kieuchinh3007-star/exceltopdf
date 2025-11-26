@@ -45,17 +45,23 @@ const PDFPreview = ({ pdfBlob }: PDFPreviewProps) => {
           </div>
         )}
         {pdfUrl && !error && (
-          <div className="w-full h-[600px] flex items-center justify-center">
+          <div className="w-full flex flex-col gap-4">
+            <div className="w-full h-[600px]">
+              <iframe
+                src={pdfUrl}
+                title="PDF Preview"
+                className="w-full h-full border-0"
+              />
+            </div>
             <p className="text-sm text-muted-foreground text-center px-6">
-              Trình duyệt của bạn đang chặn PDF trong khung nhúng.
+              Nếu PDF không hiển thị đúng, bạn có thể tải file về và mở trực tiếp trên máy.
               <br />
               <a
                 href={pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                download="excel-to-pdf.pdf"
                 className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
-                Mở PDF trong tab mới
+                Tải PDF xuống
               </a>
             </p>
           </div>
