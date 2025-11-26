@@ -58,8 +58,10 @@ const HeroSection = () => {
     const validTypes = [
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
       '.xls',
-      '.xlsx'
+      '.xlsx',
+      '.csv'
     ];
     
     const isValidType = validTypes.some(type => 
@@ -69,7 +71,7 @@ const HeroSection = () => {
     if (!isValidType) {
       toast({
         title: "Invalid file type",
-        description: "Please upload an Excel file (.xls or .xlsx)",
+        description: "Please upload an Excel or CSV file (.xls, .xlsx, or .csv)",
         variant: "destructive",
       });
       return;
@@ -224,7 +226,7 @@ const HeroSection = () => {
       setPdfBlob(pdfBlobData);
     } else {
       // Generate filename and download
-      const pdfFilename = uploadedFile!.name.replace(/\.(xlsx?|xls)$/i, '.pdf');
+      const pdfFilename = uploadedFile!.name.replace(/\.(xlsx?|xls|csv)$/i, '.pdf');
       doc.save(pdfFilename);
     }
   };
@@ -252,7 +254,7 @@ const HeroSection = () => {
       
       toast({
         title: "Download successful",
-        description: `${uploadedFile.name.replace(/\.(xlsx?|xls)$/i, '.pdf')} has been downloaded`,
+        description: `${uploadedFile.name.replace(/\.(xlsx?|xls|csv)$/i, '.pdf')} has been downloaded`,
       });
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -283,7 +285,7 @@ const HeroSection = () => {
 
           {/* Description */}
           <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-2xl mx-auto">
-            Convert Excel files (.xls, .xlsx) to high-quality PDF in seconds. Free, fast, and keeps your original formatting perfectly intact.
+            Convert Excel and CSV files (.xls, .xlsx, .csv) to high-quality PDF in seconds. Free, fast, and keeps your original formatting perfectly intact.
           </p>
 
           {/* Upload Box */}
@@ -304,7 +306,7 @@ const HeroSection = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="file-upload"
@@ -429,7 +431,7 @@ const HeroSection = () => {
                       </p>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Supports .xls and .xlsx files
+                      Supports .xls, .xlsx, and .csv files
                     </p>
                   </div>
 
